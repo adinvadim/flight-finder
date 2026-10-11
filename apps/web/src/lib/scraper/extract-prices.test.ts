@@ -134,6 +134,15 @@ describe('extractPrices', () => {
     expect(result.failureReason).toBeUndefined();
   });
 
+  it('requires known stop counts in personal deal mode while preserving legacy tolerance', async () => {
+    const base = { travelDate: '2026-06-15', price: 300, currency: 'USD', airline: 'Delta', duration: '2h' };
+    mockExtract.mockResolvedValue({ content: JSON.stringify([base, { ...base, stops: 'unknown' }, { ...base, stops: 0 },
+      { ...base, stops: '1 stop' }]), usage: { inputTokens: 1, outputTokens: 1 } });
+    const criteria = { maxPrice: null, maxStops: 1, maxDurationHours: null, preferredAirlines: [], timePreference: 'any', cabinClass: 'economy' };
+    expect((await extractPrices('page', 'https://flights.google.com', '2026-06-15', { ...criteria, strictTravelDuration: true })).prices.map(fare => fare.stops)).toEqual([0, 1]);
+    expect((await extractPrices('page', 'https://flights.google.com', '2026-06-15', criteria)).prices).toHaveLength(4);
+  });
+
   it('enforces explicit criteria when the provider returns incompatible fares', async () => {
     const base = { travelDate: '2026-06-15', price: 300, currency: 'USD', airline: 'Delta', stops: 0, duration: '2h', departureTime: '09:00' };
     mockExtract.mockResolvedValue({ content: JSON.stringify([

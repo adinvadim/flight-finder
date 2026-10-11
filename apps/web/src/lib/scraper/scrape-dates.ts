@@ -14,6 +14,7 @@
  * window is [dateTo - 2*flex, dateTo].
  */
 
+import { dealDatePairs } from '../deals/date-window';
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 export interface ScrapeDatePair {
@@ -68,7 +69,7 @@ function evenIndices(length: number, count: number): number[] {
  *   - If the range is wider than `oneWayCap`, samples evenly-spaced days,
  *     always including dateFrom and dateTo.
  *
- * Round-trip:
+ * Legacy round-trip (explicit outboundDateTo windows use the full grid):
  *   - Always emits a single (dateFrom, dateTo) pair regardless of
  *     flexibility. PriceSnapshot.flightId is keyed by airline + outbound
  *     travelDate only, so iterating multiple (outbound, return) pairs would
@@ -79,9 +80,10 @@ function evenIndices(length: number, count: number): number[] {
  *     flightId; that is a future migration, not part of this fix.
  */
 export function expandQueryDates(
-  query: { dateFrom: Date; dateTo: Date; flexibility: number; tripType: string },
+  query: { dateFrom: Date; dateTo: Date; flexibility: number; tripType: string; outboundDateTo?: Date | null; returnDateFrom?: Date | null },
   options: ExpandQueryDatesOptions = {},
 ): ScrapeDatePair[] {
+  if (query.outboundDateTo) return dealDatePairs(query);
   const oneWayCap = options.oneWayCap ?? 7;
 
   const { dateFrom, dateTo, tripType } = query;
@@ -100,7 +102,7 @@ export function expandQueryDates(
     });
   }
 
-  // Round-trip: single pair until flightId/dedupe gain return-date awareness.
+  // Preserve the legacy interpretation for queries without independent windows.
   return [{ outbound: dateFrom, return_: dateTo }];
 }
 

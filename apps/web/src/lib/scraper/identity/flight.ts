@@ -5,6 +5,7 @@ interface FlightIdentity {
   departureTime?: string | null;
   flightNumber?: string | null;
   travelDate: string;
+  returnTravelDate?: string | null;
 }
 
 /** Retain the legacy time key so older observations can match numbered flights. */
@@ -12,7 +13,7 @@ export function flightIdentifiers(origin: string, destination: string, flight: F
   const timePart = (flight.departureTime ?? '').replace(/[^0-9]/g, '') || '0000';
   const airlinePart = flight.airline.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
   const numberPart = (flight.flightNumber ?? '').replace(/\s+/g, '').toUpperCase();
-  const suffix = `${origin}-${destination}-${flight.travelDate}`;
+  const suffix = `${origin}-${destination}-${flight.travelDate}${flight.returnTravelDate ? `-${flight.returnTravelDate.slice(0, 10)}` : ''}`;
   return {
     flightId: `${airlinePart}-${numberPart || timePart}-${suffix}`,
     flightIdLegacy: `${airlinePart}-${timePart}-${suffix}`,
@@ -24,5 +25,5 @@ export function flightDepartureAlias(origin: string, destination: string, flight
   const minutes = departureClockMinutes(flight.departureTime);
   if (minutes === null) return null;
   const airline = flightIdentifiers(origin, destination, flight).flightIdLegacy.split('-')[0];
-  return JSON.stringify([airline, origin, destination, flight.travelDate, minutes]);
+  return JSON.stringify([airline, origin, destination, flight.travelDate, flight.returnTravelDate?.slice(0, 10) ?? null, minutes]);
 }

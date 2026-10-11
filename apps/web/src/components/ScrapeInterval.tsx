@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { getDeleteToken } from '@/lib/tracker-storage';
+import { useDeleteToken } from '@/lib/tracker-storage/use-delete-token';
 import styles from './ScrapeInterval.module.css';
 
 const INTERVALS = [
@@ -26,7 +26,7 @@ export function ScrapeInterval({ queryId, currentInterval, canEdit = false }: Pr
   const [interval, setInterval] = useState<number | null>(currentInterval);
   const [saving, setSaving] = useState(false);
 
-  const token = typeof window !== 'undefined' ? getDeleteToken(queryId) : null;
+  const token = useDeleteToken(queryId);
 
   if (!token && !canEdit) return null;
 

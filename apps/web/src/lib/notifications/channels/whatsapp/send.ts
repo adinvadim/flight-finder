@@ -8,7 +8,7 @@ import { notificationBoundary, notificationDeadline, notificationPost, type Noti
 function text(message: ChannelMessage, config: WhatsAppConfig): string {
   const data = message.data;
   let content = { title: message.title, body: message.body };
-  if (typeof data.origin === 'string' && typeof data.destination === 'string' && typeof data.airline === 'string' && typeof data.travelDate === 'string'
+  if (data.kind !== 'deal' && typeof data.origin === 'string' && typeof data.destination === 'string' && typeof data.airline === 'string' && typeof data.travelDate === 'string'
     && (data.currency === null || typeof data.currency === 'string') && typeof data.currentMin === 'number' && Number.isFinite(data.currentMin)
     && typeof data.baseline === 'number' && Number.isFinite(data.baseline) && typeof data.drop === 'number' && Number.isFinite(data.drop)) {
     content = newLowText({ origin: data.origin, destination: data.destination, airline: data.airline, travelDate: data.travelDate,

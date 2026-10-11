@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { getDeleteToken } from '@/lib/tracker-storage';
+import { useDeleteToken } from '@/lib/tracker-storage/use-delete-token';
 import { MAX_PRICE_VALUE } from '@/lib/limits';
 import { DepartureWindowFields } from './criteria/DepartureWindowFields';
 import styles from './TrackerFilters.module.css';
@@ -43,7 +43,7 @@ function parseOptionalNumber(value: string): number | null {
 export function TrackerFilters({ queryId, filters, canEdit = false }: Props) {
   const t = useTranslations('TrackerFilters');
   const router = useRouter();
-  const token = typeof window !== 'undefined' ? getDeleteToken(queryId) : null;
+  const token = useDeleteToken(queryId);
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [maxPrice, setMaxPrice] = useState(filters.maxPrice?.toString() ?? '');

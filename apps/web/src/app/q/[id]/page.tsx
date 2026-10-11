@@ -28,6 +28,8 @@ import { MAX_TRACKER_EDIT_EVENTS } from '@/lib/tracker-edit-events';
 import { groupDateRange } from './group-date-range';
 import { safeJsonLd } from './safe-json-ld';
 import styles from './page.module.css';
+import type { Query } from '@/generated/prisma/client';
+import { DealStatus } from '@/components/deals/DealStatus';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -79,6 +81,7 @@ function daysUntil(d: Date): number {
 interface ChartSnapshot {
   id: string;
   travelDate: string;
+  returnTravelDate?: string | null;
   price: number;
   currency: string;
   airline: string;
@@ -98,36 +101,7 @@ interface ChartSnapshot {
 }
 
 interface QueryWithSnapshots {
-  query: {
-    id: string;
-    rawInput: string;
-    origin: string;
-    originName: string;
-    destination: string;
-    destinationName: string;
-    dateFrom: Date;
-    dateTo: Date;
-    flexibility: number;
-    tripType: string;
-    active: boolean;
-    maxPrice: number | null;
-    maxStops: number | null;
-    maxDurationHours: number | null;
-    preferredAirlines: string[];
-    timePreference: string;
-    strictDepartureTime: boolean;
-    cabinClass: string;
-    expiresAt: Date;
-    createdAt: Date;
-    firstViewedAt: Date | null;
-    groupId: string | null;
-    currency: string | null;
-    scrapeInterval: number | null;
-    vpnCountries: string[];
-    preferredAggregators: string[];
-    label: string | null;
-    userId: string | null;
-  };
+  query: Query;
   snapshots: ChartSnapshot[];
   allSnapshots: ChartSnapshot[];
   editEvents: Array<{
@@ -167,7 +141,8 @@ function renderRouteBlock(qData: QueryWithSnapshots, isMultiRoute: boolean, t: T
       )}
 
       <TrackerNotifications queryId={qData.query.id} canEdit={qData.canEdit} />
-      <TrackerPriceRules queryId={qData.query.id} canEdit={qData.canEdit} />
+      {qData.query.dealMinDiscountPct == null ? <TrackerPriceRules queryId={qData.query.id} canEdit={qData.canEdit} />
+        : <DealStatus query={qData.query} cycleStartedAt={qData.lastRun?.startedAt ?? new Date()} canEdit={qData.canEdit} />}
       <section className={styles.chart}>
         <PriceChart
           trackerId={qData.query.id}
@@ -226,6 +201,7 @@ async function loadQueryWithSnapshots(id: string): Promise<QueryWithSnapshots | 
     select: {
       id: true,
       travelDate: true,
+      returnTravelDate: true,
       price: true,
       currency: true,
       airline: true,
@@ -270,6 +246,7 @@ async function loadQueryWithSnapshots(id: string): Promise<QueryWithSnapshots | 
   const allSnapshots = snapshots.map((s) => ({
     ...s,
     travelDate: s.travelDate.toISOString(),
+    returnTravelDate: s.returnTravelDate?.toISOString() ?? null,
     scrapedAt: s.scrapedAt.toISOString(),
   }));
 

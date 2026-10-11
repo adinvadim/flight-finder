@@ -8,6 +8,7 @@ interface ChartFlight {
   departureTime: string | null;
   arrivalTime: string | null;
   travelDate?: string;
+  returnTravelDate?: string | null;
   currency: string;
   vpnCountry: string | null;
 }
@@ -20,7 +21,7 @@ export function flightVisibilityKey(snapshot: ChartFlight): string {
   const persisted = unknownLegacy ? null : snapshot.flightId?.trim() || null;
   const identity = persisted ?? (snapshot.flightNumber?.trim()
     ? flightIdentifiers('', '', flight).flightId : clock ?? `observation:${snapshot.id}`);
-  return JSON.stringify([identity, clock, !snapshot.flightNumber?.trim() && clock ? snapshot.arrivalTime : null, flight.travelDate, snapshot.currency]);
+  return JSON.stringify([identity, clock, !snapshot.flightNumber?.trim() && clock ? snapshot.arrivalTime : null, flight.travelDate, snapshot.returnTravelDate?.slice(0, 10) ?? null, snapshot.currency]);
 }
 
 /** Trend calculations never compare fares observed through different exits. */

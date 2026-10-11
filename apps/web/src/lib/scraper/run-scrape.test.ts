@@ -40,6 +40,30 @@ describe('runScrapeForQuery', () => {
     });
   });
 
+  it('persists different returns and retains an unchecked return pair after partial failure', async () => {
+    const query = { ...BASE_QUERY, dateFrom: new Date('2026-12-01'), outboundDateTo: new Date('2026-12-01'),
+      returnDateFrom: new Date('2026-12-05'), dateTo: new Date('2026-12-06') };
+    mockPrisma.query.findUnique.mockResolvedValue(query);
+    const fare = { travelDate: '2026-12-01', price: 100, currency: 'USD', airline: 'Delta', bookingUrl: '', stops: 0,
+      duration: '5h', flightNumber: 'DL100', departureTime: '08:00' };
+    mockExtractPrices.mockResolvedValue({ prices: [fare], usage: { inputTokens: 100, outputTokens: 20 } });
+    expect(await runScrapeForQuery('q1')).toMatchObject({ status: 'success', snapshotsCount: 2 });
+    const first = mockPrisma.priceSnapshot.createMany.mock.calls.flatMap(([input]) => input.data);
+    expect(first.map(row => row.returnTravelDate.toISOString().slice(0, 10))).toEqual(['2026-12-05', '2026-12-06']);
+    expect(new Set(first.map(row => row.flightId)).size).toBe(2);
+    mockPrisma.priceSnapshot.createMany.mockClear();
+    mockPrisma.priceSnapshot.findMany.mockResolvedValue(first.map(row => ({ ...row, status: 'available' })));
+    mockNavigateGoogleFlights.mockImplementation(async params => ({
+      html: params.dateTo.toISOString().slice(0, 10) === '2026-12-06' ? '<html>unavailable</html>' : '<html>flights</html>',
+      url: 'https://flights.google.com', resultsFound: true, source: 'google_flights' }));
+    mockExtractPrices.mockImplementation(async html => html.includes('unavailable')
+      ? { prices: [], usage: { inputTokens: 100, outputTokens: 20 }, failureReason: 'all_filtered_out' }
+      : { prices: [fare], usage: { inputTokens: 100, outputTokens: 20 } });
+    expect(await runScrapeForQuery('q1')).toMatchObject({ status: 'partial', snapshotsCount: 1 });
+    const second = mockPrisma.priceSnapshot.createMany.mock.calls.flatMap(([input]) => input.data);
+    expect(second.some(row => row.status === 'sold_out')).toBe(false);
+  });
+
   it('keeps distinct flights available when their previously different fares become equal', async () => {
     const common = { travelDate: '2026-06-15', price: 100, currency: 'USD', airline: 'Delta', bookingUrl: '', stops: 0, duration: '5h' };
     mockExtractPrices.mockResolvedValue({ prices: [

@@ -5,6 +5,7 @@ import styles from './PriceHistory.module.css';
 export interface Snapshot {
   id: string;
   travelDate?: string;
+  returnTravelDate?: string | null;
   price: number;
   currency: string;
   airline: string;

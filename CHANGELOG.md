@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Personal flight deal monitoring.** Select an origin country and airports, independent outbound/return windows, maximum outbound stops/journey/layover hours, and a discount threshold (initially 30%). Full bounded date grids retain different return fares, while alerts compare eligible prices with comparable daily historical minima and show a five-day warmup. See [personal setup and limitations](docs/personal-deals.md).
+
+### Fixed
+
+- **Tracker controls after creation.** Browser-stored edit tokens now appear after hydration, avoiding server/client markup mismatches when opening a newly created tracker. Saved tracker capacity accommodates multi-airport monitoring groups.
+
 ## [0.15.0] - 2026-09-10
 
 Flight Finder now tracks hotels and car rentals alongside flights on your own instance. This release also adds hotel maps, account-based CLI model selection, and correct round-trip previews for longer stays.

@@ -22,6 +22,7 @@ const Plot = dynamic(async () => {
 interface Snapshot {
   id: string;
   travelDate: string;
+  returnTravelDate?: string | null;
   price: number;
   currency: string;
   airline: string;
@@ -141,7 +142,8 @@ function usePlotTheme(): PlotTheme {
 
 function flightLabel(snapshot: Snapshot, hasVpnData: boolean, mixedCurrencies: boolean, t: Translator): string {
   return [
-    snapshot.airline, snapshot.flightNumber, snapshot.travelDate.slice(0, 10), snapshot.departureTime ?? '?',
+    snapshot.airline, snapshot.flightNumber, snapshot.travelDate.slice(0, 10),
+    snapshot.returnTravelDate ? `→ ${snapshot.returnTravelDate.slice(0, 10)}` : null, snapshot.departureTime ?? '?',
     mixedCurrencies ? `(${snapshot.currency})` : null,
     hasVpnData ? `(${snapshot.vpnCountry ?? t('local')})` : null,
   ].filter(Boolean).join(' ');

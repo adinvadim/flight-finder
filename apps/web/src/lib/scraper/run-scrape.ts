@@ -22,6 +22,7 @@ import { currentTravelExecution, travelDelay, TravelCleanupError } from '../trav
 import { TravelJobError } from '../travel/errors';
 import { recordFlightAlertInTransaction } from '../notifications/flights';
 import { flightIdentifiers } from './identity/flight';
+import { datePairKey } from '../deals/date-window';
 
 const RETRYABLE_FAILURES: ExtractionFailureReason[] = [
   'empty_extraction',
@@ -323,6 +324,10 @@ async function scrapeQueryForCountry(
     maxPrice: number | null;
     maxStops: number | null;
     maxDurationHours: number | null;
+    maxLayoverHours?: number | null;
+    strictTravelDuration?: boolean;
+    outboundDateTo?: Date | null;
+    returnDateFrom?: Date | null;
     timePreference: string;
     strictDepartureTime?: boolean;
     cabinClass: string;
@@ -363,6 +368,8 @@ async function scrapeQueryForCountry(
     maxPrice: query.maxPrice,
     maxStops: query.maxStops,
     maxDurationHours: query.maxDurationHours,
+    maxLayoverHours: query.maxLayoverHours,
+    strictTravelDuration: query.strictTravelDuration,
     preferredAirlines: query.preferredAirlines,
     timePreference: query.timePreference,
     strictDepartureTime: query.strictDepartureTime ?? false,
@@ -372,17 +379,15 @@ async function scrapeQueryForCountry(
   const model = config?.model ?? 'claude-haiku-4-5-20251001';
   const costs = getModelCosts(provider, model);
 
-  // Expand the date window into per-pair scrapes. One-way iterates every day
-  // in [dateFrom, dateTo] capped at 7. Round-trip emits a single (dateFrom,
-  // dateTo) pair regardless of flexibility; iterating multiple pairs would
-  // collapse same-outbound flights with different returns at the
-  // flightId/dedupe layer.
+  // Explicit personal windows cover every date pair; legacy searches retain their sampling.
   const pairs = expandQueryDates(
     {
       dateFrom: searchParams.dateFrom,
       dateTo: searchParams.dateTo,
       flexibility: query.flexibility ?? 0,
       tripType: searchParams.tripType ?? 'round_trip',
+      outboundDateTo: query.outboundDateTo,
+      returnDateFrom: query.returnDateFrom,
     },
     { oneWayCap: 7 },
   );
@@ -398,6 +403,9 @@ async function scrapeQueryForCountry(
 
   for (const pair of pairs) {
     const pairTravelDate = pair.outbound.toISOString().slice(0, 10);
+    const returnTravelDate = query.outboundDateTo && searchParams.tripType !== 'one_way' ? pair.return_.toISOString().slice(0, 10) : null;
+    const pairKey = datePairKey(pairTravelDate, returnTravelDate);
+    if (query.outboundDateTo && pair.outbound < new Date(cycleStartedAt.toISOString().slice(0, 10))) continue;
     const pairParams: import('./navigate').FlightSearchParams = {
       ...searchParams,
       dateFrom: pair.outbound,
@@ -417,12 +425,15 @@ async function scrapeQueryForCountry(
       console.error(`[scrape] query=${queryId} pair=${pairTravelDate} threw err=${msg}`);
       totalUsage = sumTokenUsage(totalUsage, { inputTokens: null, outputTokens: null });
       lastFailureReason = lastFailureReason ?? 'page_not_loaded';
-      incompleteTravelDates.add(pairTravelDate);
+      incompleteTravelDates.add(pairKey);
       partialFailures.push(`${pairTravelDate}: check_failed`);
       continue;
     }
 
-    allPrices = allPrices.concat(pairResult.prices);
+    const pairPrices = query.outboundDateTo
+      ? pairResult.prices.filter(price => price.travelDate === pairTravelDate).map(price => ({ ...price, returnTravelDate }))
+      : pairResult.prices;
+    allPrices = allPrices.concat(pairPrices);
     totalUsage = sumTokenUsage(totalUsage, pairResult.usage);
     for (const s of pairResult.sources) sources.add(s);
     if (pairResult.lastFailureReason) {
@@ -432,9 +443,9 @@ async function scrapeQueryForCountry(
     // other flights disappeared. Retain its fares but withhold tombstones for
     // the date until every attempted source completed its extraction.
     if (pairResult.availabilityConfirmed && pairResult.prices.some(price => price.travelDate === pairTravelDate)) {
-      scrapedTravelDates.add(pairTravelDate);
+      scrapedTravelDates.add(pairKey);
     } else {
-      incompleteTravelDates.add(pairTravelDate);
+      incompleteTravelDates.add(pairKey);
       partialFailures.push(`${pairTravelDate}: ${pairResult.failures.join(', ') || 'check_incomplete'}`);
     }
   }
@@ -453,6 +464,7 @@ async function scrapeQueryForCountry(
       p.price,
       p.currency,
       p.travelDate,
+      p.returnTravelDate ?? null,
       vpnCountry ?? null,
     ]);
     if (seen.has(key)) return false;
@@ -493,7 +505,7 @@ async function scrapeQueryForCountry(
     },
     orderBy: { scrapedAt: 'desc' },
     distinct: ['flightId'],
-    select: { flightId: true, price: true, airline: true, travelDate: true, currency: true, bookingUrl: true, stops: true, duration: true, layovers: true, departureTime: true, arrivalTime: true, flightNumber: true, status: true },
+    select: { flightId: true, price: true, airline: true, travelDate: true, returnTravelDate: true, currency: true, bookingUrl: true, stops: true, duration: true, layovers: true, departureTime: true, arrivalTime: true, flightNumber: true, status: true },
   });
 
   // Match prior rows against BOTH the new and the legacy id forms so the
@@ -510,12 +522,13 @@ async function scrapeQueryForCountry(
     .filter((prev) => {
       if (!prev.flightId || prev.status !== 'available') return false;
       const prevTravelIso = prev.travelDate.toISOString().slice(0, 10);
-      if (!scrapedTravelDates.has(prevTravelIso)) return false;
+      if (!scrapedTravelDates.has(datePairKey(prevTravelIso, prev.returnTravelDate?.toISOString()))) return false;
       return !currentFlightIds.has(prev.flightId) && !currentLegacyIds.has(prev.flightId);
     })
     .map((prev) => ({
       queryId,
       travelDate: prev.travelDate,
+      returnTravelDate: prev.returnTravelDate,
       price: prev.price,
       currency: prev.currency,
       airline: prev.airline,
@@ -542,6 +555,7 @@ async function scrapeQueryForCountry(
         data: withFlightIds.map(({ flightIdLegacy: _legacy, ...p }) => ({
           queryId,
           travelDate: new Date(p.travelDate),
+          returnTravelDate: p.returnTravelDate ? new Date(p.returnTravelDate) : null,
           price: p.price,
           currency: p.currency,
           airline: p.airline,

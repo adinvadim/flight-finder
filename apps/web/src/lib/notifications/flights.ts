@@ -10,6 +10,7 @@ import { resolveBaseUrl } from './base-url';
 import { criteriaVersion, notificationBaselineFrom } from './authority/flight';
 import { recordPriceRuleAlerts } from './rules/record';
 import { decodePriceAuthority, assertPriceAuthority, type PriceEventAuthority } from './rules/authority';
+import { recordDealAlert } from './deals/record';
 import { lockNotificationQuery as lockQuery, captureNotificationRouting, decodeNotificationRouting, assertNotificationRouting, type NotificationRouting } from './subscriptions/authority';
 
 interface FlightDelivery extends ClaimedDelivery { queryId: string; queryVersion: string; price: number; routing: NotificationRouting; priceAuthority: PriceEventAuthority }
@@ -41,6 +42,10 @@ export async function recordFlightAlertInTransaction(tx: Prisma.TransactionClien
     await tx.query.update({ where: { id: queryId }, data: { lastNotifiedLowPrice: null, lastNotifiedAt: null, updatedAt: query.updatedAt } });
   }
   const baselineFrom = await notificationBaselineFrom(tx, query, options.baselineCutoff);
+  if (query.dealMinDiscountPct != null) {
+    await recordDealAlert(tx, query, cycleStartedAt, baselineFrom, routing, options.baseUrl);
+    return;
+  }
   const ruleResult = await recordPriceRuleAlerts(tx, query, cycleStartedAt, routing, baselineFrom, options.baseUrl);
   if (ruleResult.custom) return;
   // Legacy notification markers have no currency or criteria identity. The

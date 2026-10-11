@@ -2,6 +2,7 @@ import type { Prisma } from '@/generated/prisma/client';
 import { ruleCollection } from './store';
 
 export type PriceEventAuthority = { kind: 'new-low'; collectionRevision: number }
+  | { kind: 'deal'; collectionRevision: number }
   | { kind: 'price-rule'; collectionRevision: number; ruleId: string; ruleRevision: number; sequence: number };
 
 function revision(value: unknown): value is number {
@@ -14,7 +15,7 @@ export function decodePriceAuthority(eventKey: string, raw: unknown): PriceEvent
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid price event authority');
   const value = raw as Record<string, unknown>;
   if (!revision(value.collectionRevision)) throw new Error('Invalid price event authority');
-  if (value.kind === 'new-low' && eventKey.startsWith('flight:')) return { kind: value.kind, collectionRevision: value.collectionRevision };
+  if ((value.kind === 'new-low' || value.kind === 'deal') && eventKey.startsWith('flight:')) return { kind: value.kind, collectionRevision: value.collectionRevision };
   if (value.kind !== 'price-rule' || !eventKey.startsWith('flight-rule:') || typeof value.ruleId !== 'string' || !value.ruleId || value.ruleId.length > 200
     || !revision(value.ruleRevision) || value.ruleRevision === 0 || !revision(value.sequence) || value.sequence === 0) throw new Error('Invalid price event authority');
   return { kind: value.kind, collectionRevision: value.collectionRevision, ruleId: value.ruleId, ruleRevision: value.ruleRevision, sequence: value.sequence };
@@ -23,6 +24,7 @@ export function decodePriceAuthority(eventKey: string, raw: unknown): PriceEvent
 export async function assertPriceAuthority(tx: Prisma.TransactionClient, queryId: string, authority: PriceEventAuthority): Promise<void> {
   const collection = await ruleCollection(tx, queryId);
   if (collection.revision !== authority.collectionRevision) throw new Error('Price alert settings changed');
+  if (authority.kind === 'deal') return;
   if (authority.kind === 'new-low') {
     if (collection.rules.some(rule => rule.enabled)) throw new Error('Custom price rules supersede this low alert');
     return;

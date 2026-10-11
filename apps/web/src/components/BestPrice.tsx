@@ -21,6 +21,7 @@ interface Snapshot {
   scrapedAt: string;
   status?: string;
   travelDate?: string;
+  returnTravelDate?: string | null;
   flightId?: string | null;
   flightNumber?: string | null;
 }
@@ -55,6 +56,7 @@ export async function BestPrice({ snapshots, currency, filters, route }: Props) 
             {formatCurrency(best.price, best.currency)}
           </span>
           <div className={styles.details}>
+            {best.returnTravelDate && <span className={styles.meta}>{best.travelDate?.slice(0, 10)} → {best.returnTravelDate.slice(0, 10)}</span>}
             <span className={styles.airline}>{best.airline}</span>
             <span className={styles.meta}>
               {best.stops === 0 ? t('nonstop') : t('stops', { count: best.stops })}

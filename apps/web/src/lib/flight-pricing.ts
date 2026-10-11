@@ -21,6 +21,7 @@ interface FareObservation {
   airline: string;
   scrapedAt: string;
   travelDate?: string;
+  returnTravelDate?: string | null;
   flightId?: string | null;
   flightNumber?: string | null;
   departureTime?: string | null;
@@ -30,7 +31,7 @@ interface FareObservation {
 }
 
 function observationScope(snapshot: FareObservation): string {
-  return JSON.stringify([snapshot.travelDate?.slice(0, 10) ?? '', snapshot.currency, snapshot.vpnCountry ?? null]);
+  return JSON.stringify([snapshot.travelDate?.slice(0, 10) ?? '', snapshot.returnTravelDate?.slice(0, 10) ?? null, snapshot.currency, snapshot.vpnCountry ?? null]);
 }
 
 /** Latest observations retain sold-out rows until selection is complete. */

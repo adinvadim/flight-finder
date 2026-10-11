@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { getDeleteToken } from '@/lib/tracker-storage';
+import { useDeleteToken } from '@/lib/tracker-storage/use-delete-token';
 import { ALL_AGGREGATORS, AGGREGATOR_LABEL, EXPERIMENTAL_AGGREGATORS, type Aggregator } from '@/lib/aggregators';
 import styles from './AggregatorPicker.module.css';
 
@@ -26,7 +26,7 @@ export function AggregatorPicker({ queryId, currentAggregators, adminEnabledAggr
   );
   const [saving, setSaving] = useState(false);
 
-  const token = typeof window !== 'undefined' ? getDeleteToken(queryId) : null;
+  const token = useDeleteToken(queryId);
 
   if (!token && !canEdit) return null;
 

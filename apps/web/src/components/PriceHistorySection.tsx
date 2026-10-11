@@ -42,7 +42,7 @@ export function ScrapeTime({ iso }: { iso: string }) {
 }
 
 function flightName(s: Snapshot): string {
-  return `${s.airline}${s.flightNumber ? ` ${s.flightNumber}` : ''}`;
+  return `${s.airline}${s.flightNumber ? ` ${s.flightNumber}` : ''}${s.returnTravelDate ? ` ${s.travelDate?.slice(0, 10)} → ${s.returnTravelDate.slice(0, 10)}` : ''}`;
 }
 
 function timesLabel(s: Snapshot): string | null {

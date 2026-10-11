@@ -10,6 +10,7 @@ import { acquireProviderToken } from './rate-limit';
 
 export interface PriceData {
   travelDate: string; // ISO date
+  returnTravelDate?: string | null; // assigned from the searched pair, never inferred by the model
   price: number;
   currency: string;
   airline: string;
@@ -28,6 +29,8 @@ export interface QueryFilters {
   maxPrice: number | null;
   maxStops: number | null;
   maxDurationHours: number | null;
+  maxLayoverHours?: number | null;
+  strictTravelDuration?: boolean;
   preferredAirlines: string[];
   timePreference: string;
   strictDepartureTime?: boolean;
@@ -383,7 +386,7 @@ export function readField(e: Record<string, unknown>, canonical: string, aliases
  * the wrong type (e.g. qwen3 emits `stops` as an array), so neither a key
  * misspelling nor a loosely-typed value can silently drop a real flight.
  */
-function normalizeEntry(entry: unknown, travelDateFallback: string, currency: string | null): PriceData | null {
+function normalizeEntry(entry: unknown, travelDateFallback: string, currency: string | null, strictEvidence = false): PriceData | null {
   if (typeof entry !== 'object' || entry === null) return null;
   const e = entry as Record<string, unknown>;
 
@@ -395,6 +398,10 @@ function normalizeEntry(entry: unknown, travelDateFallback: string, currency: st
   const departureTime = readField(e, 'departureTime', ['departure', 'departTime']);
   const arrivalTime = readField(e, 'arrivalTime', ['arrival', 'arriveTime']);
   const flightNumber = readField(e, 'flightNumber', ['flightNo', 'flight']);
+  const stops = readField(e, 'stops', ['stopCount', 'numStops']);
+  const knownStops = typeof stops === 'number' ? Number.isInteger(stops) && stops >= 0
+    : typeof stops === 'string' && (/^\d+$/.test(stops.trim()) || /^(?:non[\s-]?stop|direct)$/i.test(stops.trim()) || /^\d+\s+stops?$/i.test(stops.trim()));
+  if (strictEvidence && !knownStops) return null;
 
   return {
     travelDate: typeof travelDate === 'string' && travelDate ? travelDate : travelDateFallback,
@@ -402,7 +409,7 @@ function normalizeEntry(entry: unknown, travelDateFallback: string, currency: st
     currency: typeof currencyVal === 'string' && currencyVal ? currencyVal : (currency ?? 'USD'),
     airline: typeof airline === 'string' ? airline.trim() : '',
     bookingUrl: typeof bookingUrl === 'string' ? bookingUrl : '',
-    stops: coerceStops(readField(e, 'stops', ['stopCount', 'numStops'])),
+    stops: coerceStops(stops),
     duration: typeof duration === 'string' ? duration : null,
     layovers: coerceLayovers(readField(e, 'layovers', ['layover', 'connections', 'stopDetails'])),
     departureTime: typeof departureTime === 'string' ? departureTime : null,
@@ -543,7 +550,7 @@ ${UNTRUSTED_CLOSE}`;
   // (string prices like "$189", `stops` as an array, etc.) from silently
   // emptying the result set. Issue #139.
   const raw = parsed.value
-    .map((entry) => normalizeEntry(entry, travelDateFallback, currency))
+    .map((entry) => normalizeEntry(entry, travelDateFallback, currency, filters.strictTravelDuration))
     .filter((p): p is PriceData => p !== null);
 
   // Filter out invalid entries: a usable flight needs a positive price and an

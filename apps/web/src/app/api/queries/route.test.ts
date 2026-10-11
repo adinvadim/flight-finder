@@ -85,6 +85,21 @@ const validBody = {
 };
 
 describe('POST /api/queries', () => {
+  const dealBody = { ...validBody, originCountry: 'ID', dealMinDiscountPct: 30, maxLayoverHours: 4,
+    dateFrom: '2027-12-01', outboundDateTo: '2027-12-03', returnDateFrom: '2027-12-05', dateTo: '2027-12-07',
+    routes: [{ origin: 'DPS', originName: 'Bali', destination: 'KUL', destinationName: 'Kuala Lumpur', selectedFlights: [] }] };
+  it('persists the explicit deal windows without converting them to pinned legacy dates', async () => {
+    const response = await POST(makeRequest(dealBody));
+    expect(response.status).toBe(201);
+    expect(mockQueryCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ originCountry: 'ID',
+      outboundDateTo: new Date('2027-12-03'), returnDateFrom: new Date('2027-12-05'), maxLayoverHours: 4,
+      strictTravelDuration: true, dealMinDiscountPct: 30 }) });
+  });
+  it.each([{ originCountry: 'TH' }, { outboundDateTo: '2027-12-31', returnDateFrom: '2028-01-01', dateTo: '2028-01-31' }])('rejects invalid country/workload before persistence: %j', async override => {
+    const response = await POST(makeRequest({ ...dealBody, ...override }));
+    expect(response.status).toBe(400);
+    expect(mockQueryCreate).not.toHaveBeenCalled();
+  });
   it.each([
     { timePreference: 'morning', strictDepartureTime: 'false' },
     { timePreference: 'any', strictDepartureTime: true },

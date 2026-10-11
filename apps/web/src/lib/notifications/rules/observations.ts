@@ -6,7 +6,7 @@ import { filterSnapshotsByTrackerFilters } from '@/lib/snapshot-filters';
 export async function ruleObservations(tx: Prisma.TransactionClient, query: Query, baselineFrom?: Date | null) {
   const rows = await tx.priceSnapshot.findMany({ where: { queryId: query.id }, orderBy: [{ scrapedAt: 'desc' }, { id: 'asc' }] });
   const entries = latestFlightObservationEntries(rows.map(row => ({ ...row,
-    travelDate: row.travelDate.toISOString().slice(0, 10), scrapedAt: row.scrapedAt.toISOString() })), query);
+    travelDate: row.travelDate.toISOString().slice(0, 10), returnTravelDate: row.returnTravelDate?.toISOString().slice(0, 10) ?? null, scrapedAt: row.scrapedAt.toISOString() })), query);
   const filtered = new Set(filterSnapshotsByTrackerFilters(entries.map(entry => entry.snapshot), query));
   const eligible = entries.filter(entry => filtered.has(entry.snapshot) && (!baselineFrom || entry.snapshot.scrapedAt >= baselineFrom.toISOString()));
   return { entries: eligible, comparisonCurrency: flightComparisonCurrency(eligible.map(entry => entry.snapshot), query.currency) };
