@@ -385,6 +385,8 @@ export async function POST(request: NextRequest) {
       const routeFlex = route.date ? 0 : flex;
       const routeExpiry = new Date(routeTo);
       routeExpiry.setDate(routeExpiry.getDate() + routeFlex);
+      // Explicit windows include their final UTC day; legacy expiry is unchanged.
+      if (deal.data) routeExpiry.setUTCDate(routeExpiry.getUTCDate() + 1);
 
       const query = await tx.query.create({
         data: {

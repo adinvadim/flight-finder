@@ -9,6 +9,7 @@
 
 ### Fixed
 
+- **Inclusive deal windows and workload limits.** Deal trackers remain active through their final UTC day, and per-route return-date pins cannot override the validated search grid.
 - **Tracker controls after creation.** Browser-stored edit tokens now appear after hydration, avoiding server/client markup mismatches when opening a newly created tracker. Saved tracker capacity accommodates multi-airport monitoring groups.
 
 ## [0.15.0] - 2026-09-10

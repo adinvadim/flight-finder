@@ -100,6 +100,28 @@ describe('POST /api/queries', () => {
     expect(response.status).toBe(400);
     expect(mockQueryCreate).not.toHaveBeenCalled();
   });
+  it('rejects a route return pin that would expand a validated 31-pair grid to 961 pairs', async () => {
+    const response = await POST(makeRequest({ ...dealBody, outboundDateTo: '2027-12-31',
+      returnDateFrom: '2028-01-01', dateTo: '2028-01-01',
+      routes: [{ ...dealBody.routes[0], returnDate: '2028-01-31' }] }));
+    expect(response.status).toBe(400);
+    expect(mockQueryCreate).not.toHaveBeenCalled();
+  });
+  it('keeps a one-way deal ending today active throughout its inclusive final UTC day', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrow = new Date(`${today}T00:00:00Z`);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    const response = await POST(makeRequest({ ...dealBody, tripType: 'one_way',
+      dateFrom: today, outboundDateTo: today, dateTo: today, returnDateFrom: null }));
+    expect(response.status).toBe(201);
+    expect(mockQueryCreate.mock.calls[0]?.[0].data.expiresAt).toEqual(tomorrow);
+  });
+  it('expires a one-way deal after the final day across a year boundary', async () => {
+    const response = await POST(makeRequest({ ...dealBody, tripType: 'one_way',
+      dateFrom: '2027-12-30', outboundDateTo: '2027-12-31', dateTo: '2027-12-31', returnDateFrom: null }));
+    expect(response.status).toBe(201);
+    expect(mockQueryCreate.mock.calls[0]?.[0].data.expiresAt).toEqual(new Date('2028-01-01T00:00:00Z'));
+  });
   it.each([
     { timePreference: 'morning', strictDepartureTime: 'false' },
     { timePreference: 'any', strictDepartureTime: true },
@@ -131,6 +153,7 @@ describe('POST /api/queries', () => {
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(201);
     expect(mockQueryCreate.mock.calls[0]?.[0].data.strictDepartureTime).toBe(false);
+    expect(mockQueryCreate.mock.calls[0]?.[0].data.expiresAt).toEqual(new Date('2026-06-22T00:00:00Z'));
   });
 
   it.each([null, 123, {}, ' '])('rejects malformed airline metadata before deriving a flight identity: %j', async (airline) => {

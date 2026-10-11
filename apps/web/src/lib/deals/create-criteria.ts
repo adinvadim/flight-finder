@@ -1,7 +1,7 @@
 import { calendarDate, dealDatePairs, MAX_DEAL_CHECKS, MAX_DEAL_DATE_PAIRS } from './date-window';
 import { airportInCountry, flightCountries } from './airports';
 
-export function dealCreationCriteria(body: Record<string, unknown>, routes: readonly { origin: string; date?: string; selectedFlights?: unknown[] }[], now = new Date()) {
+export function dealCreationCriteria(body: Record<string, unknown>, routes: readonly { origin: string; date?: string; returnDate?: string; selectedFlights?: unknown[] }[], now = new Date()) {
   if (body.outboundDateTo == null && body.dealMinDiscountPct == null && body.originCountry == null && body.maxLayoverHours == null) {
     return { data: null, error: null };
   }
@@ -19,7 +19,7 @@ export function dealCreationCriteria(body: Record<string, unknown>, routes: read
   if (body.tripType !== 'one_way' && body.tripType !== 'round_trip') return { data: null, error: 'Некорректный тип поездки.' };
   if (typeof country !== 'string' || !flightCountries.some(item => item.code === country)
     || routes.some(route => !airportInCountry(route.origin, country))) return { data: null, error: 'Аэропорты вылета должны принадлежать выбранной стране.' };
-  if (routes.some(route => route.date || route.selectedFlights?.length) || body.sourceUrl) return { data: null, error: 'Гибкий мониторинг не поддерживает закреплённые рейсы и ссылки.' };
+  if (routes.some(route => route.date || route.returnDate || route.selectedFlights?.length) || body.sourceUrl) return { data: null, error: 'Гибкий мониторинг не поддерживает закреплённые рейсы и ссылки.' };
   if (typeof discount !== 'number' || !Number.isFinite(discount) || discount < 1 || discount > 95) return { data: null, error: 'Скидка должна быть от 1 до 95%.' };
   if (layover != null && (typeof layover !== 'number' || !Number.isInteger(layover) || layover < 1 || layover > 24)) return { data: null, error: 'Пересадка: от 1 до 24 часов.' };
   const today = new Date(now.toISOString().slice(0, 10));
