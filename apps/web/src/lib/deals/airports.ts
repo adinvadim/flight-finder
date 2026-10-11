@@ -13,3 +13,11 @@ export const flightCountries = [...new Set(countryAirports.map(airport => airpor
 export function airportInCountry(code: string, country: string): boolean {
   return countryAirports.some(airport => airport.code === code && airport.country === country);
 }
+
+// A bounded discovery shortlist, not an exhaustive worldwide airport search.
+const discoveryCodes = ['KUL', 'SIN', 'BKK', 'SGN', 'NRT', 'SYD', 'DXB', 'AMS',
+  'CGK', 'HKG', 'ICN', 'TPE', 'MNL', 'PER', 'DOH', 'IST', 'LHR', 'CDG', 'FRA', 'LAX'];
+export const discoveryAirports = discoveryCodes.flatMap(code => {
+  const airport = countryAirports.find(item => item.code === code);
+  return airport ? [airport] : [];
+});

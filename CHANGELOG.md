@@ -5,6 +5,7 @@
 ### Added
 
 - **Personal flight deal monitoring.** Select an origin country and airports, independent outbound/return windows, maximum outbound stops/journey/layover hours, and a discount threshold (initially 30%). Full bounded date grids retain different return fares, while alerts compare eligible prices with comparable daily historical minima and show a five-day warmup. See [personal setup and limitations](docs/personal-deals.md).
+- **Bali multi-country preset.** Start from DPS with a 30-day one-way window and eight destinations selected from a visible 20-airport shortlist; switch to a specific country or change the monitored subset within the workload limits.
 
 ### Fixed
 

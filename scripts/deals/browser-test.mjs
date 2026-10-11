@@ -41,18 +41,11 @@ try {
   const to = page.getByRole('group', { name: 'Куда', exact: true });
   console.log('Checking country selection');
   assert.equal(await from.getByLabel('Страна', { exact: true }).inputValue(), 'ID');
-  await from.getByRole('checkbox', { name: /^CGK / }).uncheck();
-  console.log('Selecting destination');
-  await to.getByLabel('Страна', { exact: true }).selectOption('MY');
-  await to.getByRole('checkbox', { name: /^KUL / }).check();
-  console.log('Filling date windows');
-  await page.getByLabel('Вылет с', { exact: true }).fill(date(0));
-  await page.getByLabel('Вылет по', { exact: true }).fill(date(2));
-  await page.getByLabel('Возврат с', { exact: true }).fill(date(10));
-  await page.getByLabel('Возврат по', { exact: true }).fill(date(12));
-  await page.getByLabel('Маршрут туда, максимум часов', { exact: true }).fill('12');
-  await page.getByLabel('Каждая пересадка туда, максимум часов', { exact: true }).fill('3');
-  assert.ok(await page.getByText('1 маршрутов × 9 сочетаний дат = 9 проверок за цикл').isVisible());
+  assert.ok(await from.getByRole('checkbox', { name: /^DPS / }).isChecked());
+  assert.equal(await from.getByRole('checkbox', { name: /^CGK / }).isChecked(), false);
+  assert.equal(await to.getByLabel('Страна', { exact: true }).inputValue(), 'any');
+  assert.equal(await page.getByLabel('Билет', { exact: true }).inputValue(), 'one_way');
+  assert.ok(await page.getByText('8 маршрутов × 30 сочетаний дат = 240 проверок за цикл').isVisible());
   let submitted;
   await page.route('**/api/queries', async route => {
     if (route.request().method() !== 'POST') return route.continue();
@@ -61,6 +54,25 @@ try {
       { id: queryId, origin: 'DPS', destination: 'KUL', originName: 'Bali', destinationName: 'Kuala Lumpur', deleteToken: 'disposable-fixture' },
     ] } }) });
   });
+  await page.screenshot({ path: `${output}/anywhere.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Начать мониторинг', exact: true }).click();
+  await page.getByRole('heading', { name: 'Мониторинг создан' }).waitFor();
+  assert.equal(submitted.tripType, 'one_way');
+  assert.equal(submitted.routes.length, 8);
+  assert.ok(submitted.routes.every(route => route.origin === 'DPS'));
+  assert.deepEqual(submitted.routes.map(route => route.destination), ['KUL', 'SIN', 'BKK', 'SGN', 'NRT', 'SYD', 'DXB', 'AMS']);
+  console.log('Selecting destination');
+  await to.getByLabel('Страна', { exact: true }).selectOption('MY');
+  await to.getByRole('checkbox', { name: /^KUL / }).check();
+  await page.getByLabel('Билет', { exact: true }).selectOption('round_trip');
+  console.log('Filling date windows');
+  await page.getByLabel('Вылет с', { exact: true }).fill(date(0));
+  await page.getByLabel('Вылет по', { exact: true }).fill(date(2));
+  await page.getByLabel('Возврат с', { exact: true }).fill(date(10));
+  await page.getByLabel('Возврат по', { exact: true }).fill(date(12));
+  await page.getByLabel('Маршрут туда, максимум часов', { exact: true }).fill('12');
+  await page.getByLabel('Каждая пересадка туда, максимум часов', { exact: true }).fill('3');
+  assert.ok(await page.getByText('1 маршрутов × 9 сочетаний дат = 9 проверок за цикл').isVisible());
   await page.screenshot({ path: `${output}/desktop.png`, fullPage: true });
   await page.getByRole('button', { name: 'Начать мониторинг', exact: true }).click();
   await page.getByRole('heading', { name: 'Мониторинг создан' }).waitFor();
@@ -84,7 +96,7 @@ try {
   assert.ok(await page.getByText(/Обычная цена.*100/).isVisible());
   assert.deepEqual(errors, []);
   await page.screenshot({ path: `${output}/tracker.png`, fullPage: true });
-  console.log(`PASS: country selection, 9 date combinations, payload, workload rejection, 30% historical deal, mobile layout. Screenshots: ${output}`);
+  console.log(`PASS: Bali anywhere shortlist, 240 bounded checks, country selection, 9 return date combinations, payload, workload rejection, 30% historical deal, mobile layout. Screenshots: ${output}`);
 } finally {
   await browser.close();
   await pool.query('DELETE FROM "Query" WHERE id=$1', [queryId]);

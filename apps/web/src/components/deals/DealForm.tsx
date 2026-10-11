@@ -20,12 +20,15 @@ function airportResults(value: unknown): AirportResult[] {
   });
 }
 
-export function DealForm({ countries, indonesia }: { countries: { code: string; name: string }[]; indonesia: AirportResult[] }) {
-  const [origin, setOrigin] = useState<CountryState>({ country: 'ID', airports: indonesia, selected: ['CGK', 'DPS'], loading: false });
-  const [destination, setDestination] = useState<CountryState>({ country: '', airports: [], selected: [], loading: false });
-  const [tripType, setTripType] = useState('round_trip');
-  const [departureFrom, setDepartureFrom] = useState('');
-  const [departureTo, setDepartureTo] = useState('');
+export function DealForm({ countries, indonesia, discovery, initialDates }: {
+  countries: { code: string; name: string }[]; indonesia: AirportResult[]; discovery: AirportResult[];
+  initialDates: { from: string; to: string };
+}) {
+  const [origin, setOrigin] = useState<CountryState>({ country: 'ID', airports: indonesia, selected: ['DPS'], loading: false });
+  const [destination, setDestination] = useState<CountryState>({ country: 'any', airports: discovery, selected: discovery.slice(0, 8).map(airport => airport.code), loading: false });
+  const [tripType, setTripType] = useState('one_way');
+  const [departureFrom, setDepartureFrom] = useState(initialDates.from);
+  const [departureTo, setDepartureTo] = useState(initialDates.to);
   const [returnFrom, setReturnFrom] = useState('');
   const [returnTo, setReturnTo] = useState('');
   const [discount, setDiscount] = useState('30');
@@ -52,6 +55,10 @@ export function DealForm({ countries, indonesia }: { countries: { code: string; 
   async function changeCountry(side: 'origin' | 'destination', country: string) {
     const setSide = side === 'origin' ? setOrigin : setDestination;
     const sequence = ++requests.current[side];
+    if (side === 'destination' && country === 'any') {
+      setDestination({ country, airports: discovery, selected: discovery.slice(0, 8).map(airport => airport.code), loading: false });
+      return;
+    }
     setSide({ country, airports: [], selected: [], loading: !!country });
     if (!country) return;
     try {
@@ -75,7 +82,7 @@ export function DealForm({ countries, indonesia }: { countries: { code: string; 
     setSaving(true);
     try {
       const response = await fetch('/api/queries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-        rawInput: `Дешёвые билеты из ${origin.country}`, originCountry: origin.country, routes,
+        rawInput: `Дешёвые билеты из ${origin.country}${destination.country === 'any' ? ' — любые направления из выбранного набора' : ''}`, originCountry: origin.country, routes,
         dateFrom: departureFrom, outboundDateTo: departureTo, returnDateFrom: tripType === 'one_way' ? null : returnFrom,
         dateTo: tripType === 'one_way' ? departureTo : returnTo, tripType, flexibility: 0,
         dealMinDiscountPct: Number(discount), maxStops: stops === '' ? null : Number(stops),
@@ -95,7 +102,9 @@ export function DealForm({ countries, indonesia }: { countries: { code: string; 
   return <form className={styles.form} onSubmit={submit}>
     <div className={styles.columns}>
       <CountryAirports label="Откуда" countries={countries} {...origin} onCountry={country => void changeCountry('origin', country)} onSelected={selected => setOrigin({ ...origin, selected })} />
-      <CountryAirports label="Куда" countries={countries} {...destination} onCountry={country => void changeCountry('destination', country)} onSelected={selected => setDestination({ ...destination, selected })} />
+      <CountryAirports label="Куда" countries={[{ code: 'any', name: 'Любые направления — стартовый набор' }, ...countries]} {...destination}
+        description={destination.country === 'any' ? 'Выбираем среди 20 популярных аэропортов в разных странах. Отмеченные аэропорты — полное покрытие этого мониторинга; все аэропорты мира не сканируются. Можно менять набор или выбрать страну.' : undefined}
+        onCountry={country => void changeCountry('destination', country)} onSelected={selected => setDestination({ ...destination, selected })} />
     </div>
     <fieldset><legend>Гибкие даты</legend>
       <label>Билет<select aria-label="Билет" value={tripType} onChange={event => setTripType(event.target.value)}><option value="round_trip">Туда и обратно</option><option value="one_way">В одну сторону</option></select></label>

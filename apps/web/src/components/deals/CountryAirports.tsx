@@ -13,9 +13,10 @@ interface Props {
   onCountry: (country: string) => void;
   onSelected: (codes: string[]) => void;
   loading: boolean;
+  description?: string;
 }
 
-export function CountryAirports({ label, countries, country, airports, selected, onCountry, onSelected, loading }: Props) {
+export function CountryAirports({ label, countries, country, airports, selected, onCountry, onSelected, loading, description }: Props) {
   const [search, setSearch] = useState('');
   const visible = airports.filter(airport => `${airport.code} ${airport.city} ${airport.name}`.toLowerCase().includes(search.toLowerCase()));
   return <fieldset className={styles.airports}>
@@ -24,6 +25,7 @@ export function CountryAirports({ label, countries, country, airports, selected,
       <option value="">Выберите страну</option>
       {countries.map(item => <option key={item.code} value={item.code}>{item.name}</option>)}
     </select></label>
+    {description && <p>{description}</p>}
     <label>Найти аэропорт<input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Город или IATA: DPS, CGK…" /></label>
     <div className={styles.actions}>
       <button type="button" disabled={loading || !visible.length} onClick={() => onSelected([...new Set([...selected, ...visible.map(item => item.code)])])}>Выбрать найденные</button>
