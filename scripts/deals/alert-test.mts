@@ -22,6 +22,12 @@ try {
   await prisma.priceSnapshot.create({ data: { ...observation, price: 70, scrapedAt: new Date() } });
   await recordFlightAlert(query.id, cycle);
   assert.equal(await prisma.travelAlertDelivery.count({ where: { queryId: query.id } }), 0, 'Four days must not authorize a deal');
+  const expiredDeparture = new Date(new Date().toISOString().slice(0, 10));
+  expiredDeparture.setUTCDate(expiredDeparture.getUTCDate() - 1);
+  const expiredObservation = { ...observation, travelDate: expiredDeparture };
+  await prisma.priceSnapshot.createMany({ data: Array.from({ length: 5 }, (_, index) => ({ ...expiredObservation, price: 100,
+    scrapedAt: new Date(cycle.getTime() - (index + 1) * 86_400_000) })) });
+  await prisma.priceSnapshot.create({ data: { ...expiredObservation, price: 40, scrapedAt: new Date() } });
   await prisma.priceSnapshot.create({ data: { ...observation, price: 100, scrapedAt: new Date(cycle.getTime() - 5 * 86_400_000) } });
   await recordFlightAlert(query.id, cycle);
   await recordFlightAlert(query.id, cycle);
@@ -36,6 +42,7 @@ try {
   await prisma.$transaction(tx => assertPriceAuthority(tx, query.id, authority));
   assert.equal(events[0]!.deliveredIds.length, 0, 'This acceptance check must not deliver externally');
   assert.ok(message.data && typeof message.data === 'object' && !Array.isArray(message.data));
+  assert.equal(message.data.travelDate, outbound.toISOString().slice(0, 10), 'A stronger expired fare must not hide a future deal');
   const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
   await prisma.travelAlertDelivery.update({ where: { id: events[0]!.id }, data: {
     message: { ...message, data: { ...message.data, travelDate: yesterday } }, nextAttemptAt: new Date(0),
