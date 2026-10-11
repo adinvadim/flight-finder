@@ -14,11 +14,12 @@ const token = (await readFile(process.env.DEAL_TEST_SESSION_FILE, 'utf8')).trim(
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const queryId = randomUUID();
 const browser = await chromium.launch({ headless: true });
-const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1280, height: 1000 } });
+const context = await browser.newContext({ ignoreHTTPSErrors: true, serviceWorkers: 'block', viewport: { width: 1280, height: 1000 } });
 await addBrowserSession(context, origin, token);
 const page = await context.newPage();
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
+page.on('console', entry => { if (entry.type() === 'error') errors.push(entry.text()); });
 const output = process.env.DEAL_TEST_OUTPUT ?? '/tmp/flight-finder-browser';
 await mkdir(output, { recursive: true });
 const tomorrow = new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10);
@@ -33,7 +34,7 @@ try {
       [randomUUID(), queryId, date(0), date(10), day === 0 ? 70 : 100, 'USD', 'Fixture Air', '8h', JSON.stringify([{duration:'2h',airport:'SIN'}]), scrapedAt, 'https://booking.example/deal', `FixtureAir-0800-DPS-KUL-${date(0)}-${date(10)}`]);
   }
   await pool.query('INSERT INTO "FetchRun" (id,"queryId",status,"startedAt","snapshotsCount") VALUES ($1,$2,$3,$4,1)', [randomUUID(), queryId, 'success', new Date(Date.now() - 60_000)]);
-  await page.goto(`${origin}/deals`);
+  await page.goto(`${origin}/deals`, { waitUntil: 'networkidle' });
   console.log('Loaded deals', await page.title());
   await page.screenshot({path: `${output}/initial.png`, fullPage: true});
   await page.getByRole('heading', { name: 'Ловим дешёвые билеты' }).waitFor();
@@ -90,7 +91,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: `${output}/mobile.png`, fullPage: true });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Mobile form overflow');
-  await page.goto(`${origin}/q/${queryId}`);
+  await page.goto(`${origin}/q/${queryId}`, { waitUntil: 'networkidle' });
   await page.getByRole('heading', { name: 'Уведомляем при скидке от 30%' }).waitFor();
   assert.ok(await page.getByText(/выгодный билет.*скидка 30.0%/).isVisible());
   assert.ok(await page.getByText(/Обычная цена.*100/).isVisible());

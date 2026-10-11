@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { prisma } from '../../apps/web/src/lib/prisma';
-import { recordFlightAlert } from '../../apps/web/src/lib/notifications/flights';
+import { recordFlightAlert, deliverFlightAlerts } from '../../apps/web/src/lib/notifications/flights';
 import { assertPriceAuthority, decodePriceAuthority } from '../../apps/web/src/lib/notifications/rules/authority';
 
 const database = new URL(process.env.DATABASE_URL ?? '');
@@ -35,7 +35,16 @@ try {
   assert.equal(authority.kind, 'deal');
   await prisma.$transaction(tx => assertPriceAuthority(tx, query.id, authority));
   assert.equal(events[0]!.deliveredIds.length, 0, 'This acceptance check must not deliver externally');
-  console.log('PASS: real PostgreSQL baseline warmup, 30% deal outbox, deduplication, delivery authority; no external notification sent.');
+  assert.ok(message.data && typeof message.data === 'object' && !Array.isArray(message.data));
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  await prisma.travelAlertDelivery.update({ where: { id: events[0]!.id }, data: {
+    message: { ...message, data: { ...message.data, travelDate: yesterday } }, nextAttemptAt: new Date(0),
+  } });
+  await deliverFlightAlerts();
+  const expired = await prisma.travelAlertDelivery.findUniqueOrThrow({ where: { id: events[0]!.id } });
+  assert.equal(expired.pending, false, 'An expired departure must cancel delivery while the tracker remains active');
+  assert.equal(expired.deliveredIds.length, 0, 'An overdue deal must not be transported');
+  console.log('PASS: real PostgreSQL warmup, 30% outbox, deduplication, authority and overdue departure cancellation; no external notification sent.');
 } finally {
   await prisma.query.delete({ where: { id: query.id } });
   await prisma.$disconnect();

@@ -723,7 +723,7 @@ export async function runFullScrapeForQuery(
   const defaultVpnCountries = config?.vpnCountries ?? [];
   const proxyUrl = vpnProvider.getProxyUrl?.() ?? undefined;
 
-  const countries = query.vpnCountries.length > 0 ? query.vpnCountries : defaultVpnCountries;
+  const countries = query.dealMinDiscountPct != null ? [] : query.vpnCountries.length > 0 ? query.vpnCountries : defaultVpnCountries;
   const countriesToScrape: (string | null)[] = countries.length > 0
     ? [null, ...countries]
     : [null];
@@ -855,7 +855,7 @@ async function runScrapeAllInner(): Promise<ScrapeResult[]> {
   const allVpnCountries = new Set<string>();
   const queryCountryMap = new Map<string, string[]>();
   for (const q of dueQueries) {
-    const countries = q.vpnCountries.length > 0 ? q.vpnCountries : defaultVpnCountries;
+    const countries = q.dealMinDiscountPct != null ? [] : q.vpnCountries.length > 0 ? q.vpnCountries : defaultVpnCountries;
     queryCountryMap.set(q.id, countries);
     for (const c of countries) allVpnCountries.add(c);
   }

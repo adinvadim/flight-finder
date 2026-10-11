@@ -50,6 +50,7 @@ vi.mock('fs/promises', () => ({
 }));
 
 import { runScrapeForQuery as scrapeAdmittedQuery } from '../../lib/scraper/run-scrape';
+import { runFullScrapeForQuery as scrapeAdmittedFullQuery } from '../../lib/scraper/run-scrape';
 
 const lease = { id: 'vpn', owner: 'unit-worker', generation: 1, topologyVersion: 1 };
 const job = { id: 'unit-job', kind: 'flight_query', queryId: 'q1', userId: null, status: 'running' } as TravelJob;
@@ -69,6 +70,11 @@ beforeEach(() => {
 export async function runScrapeForQuery(...args: Parameters<typeof scrapeAdmittedQuery>) {
   const config = await mockPrisma.extractionConfig.findFirst() as ExtractionConfig | null;
   return withTravelContext({ job, lease, config, vpn: new TravelVpnSession(lease, 'none') }, () => scrapeAdmittedQuery(...args));
+}
+
+export async function runFullScrapeForQuery(...args: Parameters<typeof scrapeAdmittedFullQuery>) {
+  const config = await mockPrisma.extractionConfig.findFirst() as ExtractionConfig | null;
+  return withTravelContext({ job, lease, config, vpn: new TravelVpnSession(lease, 'none') }, () => scrapeAdmittedFullQuery(...args));
 }
 
 export const BASE_QUERY = {

@@ -127,6 +127,7 @@ export function DealForm({ countries, indonesia, discovery, initialDates }: {
     </fieldset>
     <div className={styles.summary} aria-live="polite"><strong>{routes.length} маршрутов × {pairs.length} сочетаний дат = {checks} проверок за цикл</strong>
       <p>До 20 маршрутов, {MAX_DEAL_DATE_PAIRS} сочетаний дат на маршрут и {MAX_DEAL_CHECKS} проверок всего; каждое окно — до 31 дня. Поиск через браузер и AI может занять время и расходовать API-бюджет.</p>
+      <p>Проверяем один текущий рынок. Дополнительные VPN-проверки из Settings здесь не применяются.</p>
       {tooWide && <p role="alert">Сузьте даты или выберите меньше аэропортов.</p>}
     </div>
     <p>После создания откройте мониторинг и подключите Telegram или другой канал в Notifications. Проверки идут по расписанию из Settings; интервал можно менять в мониторинге.</p>

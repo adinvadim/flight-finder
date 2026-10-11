@@ -518,6 +518,13 @@ describe('pageRedirectedToHomepage (the #65 headline failure mode)', () => {
 // two-criterion signal requires both currency density (3+ mentions) and at
 // least one price-shaped token with letter-boundary protection.
 describe('hasFlightPriceSignal (two-criterion airline page heuristic, issue #65)', () => {
+  it.each(['IDR 1,000,000 / IDR 900,000 / IDR 800,000', 'Rp1.000.000 / Rp 900.000 / Rp.800.000',
+    'RUB 10000 / RUB 9000 / RUB 8000', '10 000 ₽ / 9 000 ₽ / 8 000 ₽', '₽10000 / ₽9000 / ₽8000'])('recognizes fares in a deal-form currency: %s', text => {
+    expect(hasFlightPriceSignal(text)).toBe(true);
+  });
+  it('keeps sparse rupiah marketing pages out of extraction', () => {
+    expect(hasFlightPriceSignal('Prices from Rp 100,000')).toBe(false);
+  });
   it('rejects a stub page with one EUR mention and no digits', () => {
     expect(hasFlightPriceSignal('Discover EUR fares with flexible booking.')).toBe(false);
   });

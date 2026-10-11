@@ -107,6 +107,11 @@ describe('POST /api/queries', () => {
     expect(response.status).toBe(400);
     expect(mockQueryCreate).not.toHaveBeenCalled();
   });
+  it('rejects extra VPN passes in an explicitly bounded deal search', async () => {
+    const response = await POST(makeRequest({ ...dealBody, vpnCountries: ['JP'] }));
+    expect(response.status).toBe(400);
+    expect(mockQueryCreate).not.toHaveBeenCalled();
+  });
   it('keeps a one-way deal ending today active throughout its inclusive final UTC day', async () => {
     const today = new Date().toISOString().slice(0, 10);
     const tomorrow = new Date(`${today}T00:00:00Z`);

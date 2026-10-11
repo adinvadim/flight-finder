@@ -6,6 +6,7 @@ import { ruleCollection } from '../rules/store';
 import type { NotificationRouting } from '../subscriptions/authority';
 import { safeHttpUrl } from '../../safe-url';
 import { formatCurrency } from '../../currency';
+import { dealAlertExpiry } from './expiry';
 
 export async function recordDealAlert(tx: Prisma.TransactionClient, query: Query, cycleStartedAt: Date,
   baselineFrom: Date | null, routing: NotificationRouting, baseUrl: string | null): Promise<void> {
@@ -17,6 +18,7 @@ export async function recordDealAlert(tx: Prisma.TransactionClient, query: Query
   if (!deal || deal.normalPrice === null || deal.discountPct === null) return;
   const snapshot = deal.snapshot;
   const travelDate = snapshot.travelDate.toISOString().slice(0, 10);
+  if (dealAlertExpiry(travelDate) <= new Date()) return;
   const returnDate = snapshot.returnTravelDate?.toISOString().slice(0, 10) ?? null;
   const key = createHash('sha256').update(JSON.stringify([query.id, query.userId, queryVersion, routing.revision,
     collection.revision, travelDate, returnDate, snapshot.stops, snapshot.currency, snapshot.price, snapshot.vpnCountry])).digest('hex');

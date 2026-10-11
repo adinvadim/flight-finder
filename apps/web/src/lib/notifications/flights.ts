@@ -11,9 +11,10 @@ import { criteriaVersion, notificationBaselineFrom } from './authority/flight';
 import { recordPriceRuleAlerts } from './rules/record';
 import { decodePriceAuthority, assertPriceAuthority, type PriceEventAuthority } from './rules/authority';
 import { recordDealAlert } from './deals/record';
+import { dealAlertExpiry } from './deals/expiry';
 import { lockNotificationQuery as lockQuery, captureNotificationRouting, decodeNotificationRouting, assertNotificationRouting, type NotificationRouting } from './subscriptions/authority';
 
-interface FlightDelivery extends ClaimedDelivery { queryId: string; queryVersion: string; price: number; routing: NotificationRouting; priceAuthority: PriceEventAuthority }
+interface FlightDelivery extends ClaimedDelivery { queryId: string; queryVersion: string; price: number; routing: NotificationRouting; priceAuthority: PriceEventAuthority; dealExpiresAt: Date | null }
 
 async function flightAlertOptions(tx: Prisma.TransactionClient, cycleStartedAt: Date) {
   await lockTravelAdmission(tx);
@@ -70,7 +71,7 @@ export async function recordFlightAlert(queryId: string, cycleStartedAt: Date): 
   await notificationTransaction(tx => recordFlightAlertInTransaction(tx, queryId, cycleStartedAt));
 }
 
-function flightPayload(row: TravelAlertDelivery): { payload: ChannelMessage; owner: string | null; queryVersion: string; price: number; routing: NotificationRouting; priceAuthority: PriceEventAuthority; requiredChannelIds?: string[] } {
+function flightPayload(row: TravelAlertDelivery): { payload: ChannelMessage; owner: string | null; queryVersion: string; price: number; routing: NotificationRouting; priceAuthority: PriceEventAuthority; dealExpiresAt: Date | null; requiredChannelIds?: string[] } {
   const message = row.message;
   if (!message || typeof message !== 'object' || Array.isArray(message)) throw new Error('Invalid flight notification');
   const data = message.data;
@@ -83,6 +84,7 @@ function flightPayload(row: TravelAlertDelivery): { payload: ChannelMessage; own
   return {
     payload: { title: message.title, body: message.body, url: message.url, data: data as unknown as ChannelMessage['data'] },
     owner: data.userId, queryVersion: data.queryVersion, price: data.currentMin, routing, priceAuthority,
+    dealExpiresAt: priceAuthority.kind === 'deal' ? dealAlertExpiry(data.travelDate) : null,
     requiredChannelIds: routing.mode === 'selected' ? routing.channels.map(channel => channel.id) : undefined,
   };
 }
@@ -95,7 +97,8 @@ async function claim(id: string, queryId: string): Promise<FlightDelivery | null
     let details: ReturnType<typeof flightPayload>;
     try {
       details = flightPayload(row);
-      if (!query?.active || query.expiresAt <= new Date() || query.userId !== details.owner || criteriaVersion(query) !== details.queryVersion) throw new Error('Flight query changed');
+      if (!query?.active || query.expiresAt <= new Date() || (details.dealExpiresAt && details.dealExpiresAt <= new Date())
+        || query.userId !== details.owner || criteriaVersion(query) !== details.queryVersion) throw new Error('Flight query or deal expired');
       await assertNotificationRouting(tx, queryId, details.owner, details.routing);
       await assertPriceAuthority(tx, queryId, details.priceAuthority);
     } catch {
@@ -111,7 +114,7 @@ async function guarded<T>(entry: FlightDelivery, work: (tx: Prisma.TransactionCl
   return notificationTransaction(async tx => {
     const query = await lockQuery(tx, entry.queryId);
     const row = await tx.travelAlertDelivery.findUnique({ where: { id: entry.id } });
-    if (!query?.active || query.expiresAt <= new Date() || query.userId !== entry.owner || criteriaVersion(query) !== entry.queryVersion
+    if (!query?.active || query.expiresAt <= new Date() || (entry.dealExpiresAt && entry.dealExpiresAt <= new Date()) || query.userId !== entry.owner || criteriaVersion(query) !== entry.queryVersion
       || !row?.pending || row.claimToken !== entry.claimToken || !row.claimExpiresAt || row.claimExpiresAt <= new Date()) throw new Error('Flight notification delivery authority was lost');
     await assertNotificationRouting(tx, entry.queryId, entry.owner, entry.routing);
     await assertPriceAuthority(tx, entry.queryId, entry.priceAuthority);
