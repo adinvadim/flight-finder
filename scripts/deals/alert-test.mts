@@ -6,6 +6,7 @@ import { assertPriceAuthority, decodePriceAuthority } from '../../apps/web/src/l
 const database = new URL(process.env.DATABASE_URL ?? '');
 assert.ok(['localhost', '127.0.0.1'].includes(database.hostname), 'Use a disposable local PostgreSQL database');
 assert.equal(await prisma.notificationChannel.count({ where: { enabled: true } }), 0, 'Fixture database must have no enabled delivery channels');
+process.env.APP_URL = 'https://tracker.example';
 const cycle = new Date(Date.now() - 1_000);
 const outbound = new Date(Date.now() + 60 * 86_400_000);
 const returnDate = new Date(outbound.getTime() + 7 * 86_400_000);
@@ -36,6 +37,7 @@ try {
   const message = events[0]!.message;
   assert.ok(message && typeof message === 'object' && !Array.isArray(message));
   assert.equal(message.title, 'DPS → KUL: −30%');
+  assert.equal(message.url, observation.bookingUrl, 'The Telegram-visible link must open the seller even when a tracker URL exists');
   assert.ok(typeof message.body === 'string' && message.body.includes('5 дней наблюдений'));
   const authority = decodePriceAuthority(events[0]!.eventKey, message.priceAuthority);
   assert.equal(authority.kind, 'deal');

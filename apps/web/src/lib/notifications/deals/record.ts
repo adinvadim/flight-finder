@@ -33,7 +33,7 @@ export async function recordDealAlert(tx: Prisma.TransactionClient, query: Query
     `Проверено ${snapshot.scrapedAt.toISOString()}. Проверьте итоговую цену, багаж и обратный маршрут у продавца.`,
   ].join('\n');
   await tx.travelAlertDelivery.upsert({ where: { eventKey: `flight:${key}` }, update: {}, create: { queryId: query.id,
-    eventKey: `flight:${key}`, message: { title, body, url: chartUrl || safeHttpUrl(snapshot.bookingUrl),
+    eventKey: `flight:${key}`, message: { title, body, url: safeHttpUrl(snapshot.bookingUrl) || chartUrl,
       priceAuthority: { kind: 'deal', collectionRevision: collection.revision },
       notificationRouting: JSON.parse(JSON.stringify(routing)), data: { kind: 'deal', queryId: query.id, userId: query.userId,
         queryVersion, currentMin: snapshot.price, baseline: deal.normalPrice, drop: deal.normalPrice - snapshot.price,
