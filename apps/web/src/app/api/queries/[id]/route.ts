@@ -17,6 +17,8 @@ type TrackerEditField =
   | 'maxPrice'
   | 'maxStops'
   | 'maxDurationHours'
+  | 'maxLayoverHours'
+  | 'dealMinDiscountPct'
   | 'preferredAirlines'
   | 'timePreference'
   | 'strictDepartureTime';
@@ -29,6 +31,8 @@ interface EditableQuery {
   maxPrice: number | null;
   maxStops: number | null;
   maxDurationHours: number | null;
+  maxLayoverHours: number | null;
+  dealMinDiscountPct: number | null;
   preferredAirlines: string[];
   preferredAggregators: string[];
   timePreference: string;
@@ -56,6 +60,8 @@ const EDIT_FIELD_LABELS: Record<TrackerEditField, string> = {
   maxPrice: 'Max price',
   maxStops: 'Stops',
   maxDurationHours: 'Max duration',
+  maxLayoverHours: 'Max layover',
+  dealMinDiscountPct: 'Deal discount',
   preferredAirlines: 'Airlines',
   timePreference: 'Departure window',
   strictDepartureTime: 'Strict departure window',
@@ -97,6 +103,9 @@ function formatEditValue(field: TrackerEditField, value: TrackerEditValue): stri
       return `Under ${value}`;
     case 'maxStops':
       return value === 0 ? 'Nonstop only' : `Max ${value} stop${value === 1 ? '' : 's'}`;
+    case 'dealMinDiscountPct':
+      return `${value}%`;
+    case 'maxLayoverHours':
     case 'maxDurationHours':
       return `Under ${value}h`;
     case 'preferredAirlines':
@@ -170,6 +179,8 @@ export async function PATCH(
       maxPrice: true,
       maxStops: true,
       maxDurationHours: true,
+      maxLayoverHours: true,
+      dealMinDiscountPct: true,
       preferredAirlines: true,
       preferredAggregators: true,
       timePreference: true,
@@ -190,6 +201,8 @@ export async function PATCH(
     maxPrice?: number | null;
     maxStops?: number | null;
     maxDurationHours?: number | null;
+    maxLayoverHours?: number | null;
+    dealMinDiscountPct?: number;
     preferredAirlines?: string[];
     timePreference?: string;
     strictDepartureTime?: boolean;
@@ -207,6 +220,17 @@ export async function PATCH(
     if (error) return apiError(error, 400);
     if (hasOwn(body, 'timePreference')) cascadeData.timePreference = body.timePreference;
     if (hasOwn(body, 'strictDepartureTime')) cascadeData.strictDepartureTime = body.strictDepartureTime;
+  }
+
+  if (body && hasOwn(body, 'dealMinDiscountPct')) {
+    const n = body.dealMinDiscountPct;
+    if (query.dealMinDiscountPct == null || typeof n !== 'number' || !Number.isFinite(n) || n < 1 || n > 95) return apiError('Deal discount must be between 1 and 95 for a deal tracker', 400);
+    cascadeData.dealMinDiscountPct = n;
+  }
+  if (body && hasOwn(body, 'maxLayoverHours')) {
+    const n = body.maxLayoverHours;
+    if (n !== null && (typeof n !== 'number' || !Number.isInteger(n) || n < 1 || n > 24)) return apiError('Max layover must be null or between 1 and 24 hours', 400);
+    cascadeData.maxLayoverHours = n;
   }
 
   if (body && hasOwn(body, 'scrapeInterval')) {
@@ -326,6 +350,8 @@ export async function PATCH(
         maxPrice: true,
         maxStops: true,
         maxDurationHours: true,
+        maxLayoverHours: true,
+        dealMinDiscountPct: true,
         preferredAirlines: true,
         preferredAggregators: true,
         timePreference: true,
@@ -347,6 +373,8 @@ export async function PATCH(
   const eventData: Partial<Record<TrackerEditField, TrackerEditValue>> = {};
   if (hasOwn(cascadeData, 'maxPrice')) eventData.maxPrice = cascadeData.maxPrice ?? null;
   if (hasOwn(cascadeData, 'maxStops')) eventData.maxStops = cascadeData.maxStops ?? null;
+  if (hasOwn(cascadeData, 'dealMinDiscountPct')) eventData.dealMinDiscountPct = cascadeData.dealMinDiscountPct ?? null;
+  if (hasOwn(cascadeData, 'maxLayoverHours')) eventData.maxLayoverHours = cascadeData.maxLayoverHours ?? null;
   if (hasOwn(cascadeData, 'maxDurationHours')) eventData.maxDurationHours = cascadeData.maxDurationHours ?? null;
   if (hasOwn(cascadeData, 'preferredAirlines')) eventData.preferredAirlines = cascadeData.preferredAirlines ?? [];
   if (hasOwn(cascadeData, 'timePreference')) eventData.timePreference = cascadeData.timePreference ?? 'any';
@@ -358,7 +386,7 @@ export async function PATCH(
     if (hasOwn(cascadeData, 'timePreference') || hasOwn(cascadeData, 'strictDepartureTime')) {
       targets = await tx.$queryRaw<EditableQuery[]>(Prisma.sql`
         SELECT id, "deleteToken", "groupId", "userId", "maxPrice", "maxStops",
-          "maxDurationHours", "preferredAirlines", "preferredAggregators", "timePreference", "strictDepartureTime"
+          "maxDurationHours", "maxLayoverHours", "dealMinDiscountPct", "preferredAirlines", "preferredAggregators", "timePreference", "strictDepartureTime"
         FROM "Query" WHERE id IN (${Prisma.join(idsToUpdate)}) ORDER BY id FOR UPDATE
       `);
       if (targets.length !== idsToUpdate.length) return 'Tracker group changed. Reload before editing.';

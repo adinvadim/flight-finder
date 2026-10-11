@@ -29,6 +29,7 @@ describe('flight display identity', () => {
   it('keeps currencies and travel dates independent', () => {
     expect(flightVisibilityKey(flight)).not.toBe(flightVisibilityKey({ ...flight, currency: 'EUR' }));
     expect(flightVisibilityKey(flight)).not.toBe(flightVisibilityKey({ ...flight, travelDate: '2027-06-16' }));
+    expect(flightVisibilityKey({ ...flight, returnTravelDate: '2027-06-20' })).not.toBe(flightVisibilityKey({ ...flight, returnTravelDate: '2027-06-21' }));
   });
 
   it('retains separate unidentifiable observations', () => {

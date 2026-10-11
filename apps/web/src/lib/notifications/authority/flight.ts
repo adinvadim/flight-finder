@@ -4,7 +4,11 @@ import type { Prisma, Query } from '@/generated/prisma/client';
 /** Notification runtime state is separate from scraper criteria authority. */
 export function criteriaVersion(query: Query): string {
   const metadata = new Set(['updatedAt', 'firstViewedAt', 'lastNotifiedLowPrice', 'lastNotifiedAt']);
-  const criteria = Object.entries(query).filter(([key]) => !metadata.has(key)).sort(([a], [b]) => a.localeCompare(b));
+  // Inactive additive defaults must preserve pre-upgrade queued notification authority.
+  const nullableDealFields = new Set(['originCountry', 'outboundDateTo', 'returnDateFrom', 'dealMinDiscountPct', 'maxLayoverHours']);
+  const criteria = Object.entries(query).filter(([key, value]) => !metadata.has(key)
+    && !(nullableDealFields.has(key) && value === null)
+    && !(key === 'strictTravelDuration' && value === false)).sort(([a], [b]) => a.localeCompare(b));
   return createHash('sha256').update(JSON.stringify(criteria)).digest('hex');
 }
 

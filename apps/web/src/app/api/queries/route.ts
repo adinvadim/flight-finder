@@ -18,6 +18,7 @@ import { lockTravelAdmission } from '@/lib/travel/admission';
 import { TravelJobError } from '@/lib/travel/errors';
 import { departureCriteriaError, matchesDepartureWindow } from '@/lib/criteria/departure';
 import { flightIdentifiers } from '@/lib/scraper/identity/flight';
+import { dealCreationCriteria } from '@/lib/deals/create-criteria';
 
 const MAX_ROUTES = 20;
 const MAX_FLIGHTS_PER_ROUTE = 50;
@@ -331,6 +332,8 @@ export async function POST(request: NextRequest) {
   }
 
   const flex = Math.max(0, Math.min(Number(flexibility) || 0, 14));
+  const deal = dealCreationCriteria(body, routeInputs);
+  if (deal.error) return apiError(deal.error, 400);
   const expiresAt = new Date(to);
   expiresAt.setDate(expiresAt.getDate() + flex);
 
@@ -382,6 +385,8 @@ export async function POST(request: NextRequest) {
       const routeFlex = route.date ? 0 : flex;
       const routeExpiry = new Date(routeTo);
       routeExpiry.setDate(routeExpiry.getDate() + routeFlex);
+      // Explicit windows include their final UTC day; legacy expiry is unchanged.
+      if (deal.data) routeExpiry.setUTCDate(routeExpiry.getUTCDate() + 1);
 
       const query = await tx.query.create({
         data: {
@@ -394,6 +399,7 @@ export async function POST(request: NextRequest) {
           dateFrom: routeFrom,
           dateTo: routeTo,
           flexibility: routeFlex,
+          ...(deal.data ?? {}),
           maxPrice: maxPriceValidated,
           maxStops: maxStopsValidated,
           maxDurationHours: maxDurationHoursValidated,

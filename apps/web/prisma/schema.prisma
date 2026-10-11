@@ -18,6 +18,12 @@ model Query {
   dateFrom        DateTime
   dateTo          DateTime
   flexibility     Int      @default(0)
+  originCountry   String?
+  outboundDateTo  DateTime? // explicit inclusive outbound window; null preserves legacy searches
+  returnDateFrom  DateTime?
+  dealMinDiscountPct Float? // null = legacy alerts; otherwise compare daily historical minima
+  maxLayoverHours Int?
+  strictTravelDuration Boolean @default(false)
   maxPrice        Float?
   maxStops        Int?
   maxDurationHours Int?     // optional cap on total trip duration in hours
@@ -127,6 +133,7 @@ model PriceSnapshot {
   id                String   @id @default(cuid())
   queryId           String
   travelDate        DateTime
+  returnTravelDate  DateTime?
   price             Float
   currency          String   @default("USD")
   airline           String

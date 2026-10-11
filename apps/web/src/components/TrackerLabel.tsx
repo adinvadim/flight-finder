@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useTranslations } from 'next-intl';
-import { getDeleteToken } from '@/lib/tracker-storage';
+import { useDeleteToken } from '@/lib/tracker-storage/use-delete-token';
 import styles from './TrackerLabel.module.css';
 
 interface Props {
@@ -21,7 +21,7 @@ export function TrackerLabel({ queryId, currentLabel, canEdit = false }: Props) 
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const token = typeof window !== 'undefined' ? getDeleteToken(queryId) : null;
+  const token = useDeleteToken(queryId);
 
   const save = async (value: string) => {
     const trimmed = value.trim();

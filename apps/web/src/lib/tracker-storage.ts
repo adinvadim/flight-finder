@@ -18,7 +18,7 @@ export function getDeleteToken(id: string): string | null {
 
 // "ft-" prefix kept across the Flight Finder rename so existing browsers preserve state.
 const STORAGE_KEY = 'ft-trackers';
-const MAX_ENTRIES = 15;
+const MAX_ENTRIES = 100;
 
 export function getSavedTrackers(): SavedTracker[] {
   if (typeof window === 'undefined') return [];
@@ -36,10 +36,12 @@ export function addSavedTracker(tracker: SavedTracker): void {
   const existing = getSavedTrackers().filter((t) => t.id !== tracker.id);
   const updated = [tracker, ...existing].slice(0, MAX_ENTRIES);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  window.dispatchEvent(new Event('ft-trackers-changed'));
 }
 
 export function removeSavedTracker(id: string): void {
   if (typeof window === 'undefined') return;
   const updated = getSavedTrackers().filter((t) => t.id !== id);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  window.dispatchEvent(new Event('ft-trackers-changed'));
 }

@@ -1,0 +1,24 @@
+.root { max-width: 1050px; margin: 0 auto; padding: 28px 20px 60px; color: var(--text); }
+.root h1 { margin: 24px 0 12px; font-size: clamp(1.7rem, 4vw, 2.5rem); }
+.root p { line-height: 1.6; }
+.form { display: grid; gap: 22px; margin-top: 28px; }
+.form fieldset, .summary { min-width: 0; border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+.form legend { font-weight: 650; padding: 0 8px; }
+.columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.form label { display: grid; gap: 8px; font-size: 0.95rem; margin: 10px 0; }
+.form input, .form select { min-width: 0; width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; color: inherit; background: var(--surface); font: inherit; }
+.form input:focus-visible, .form select:focus-visible, .form button:focus-visible { outline: 3px solid #6285e0; outline-offset: 2px; }
+.airportList { max-height: 250px; overflow: auto; margin: 14px 0; }
+.form .airport { display: flex; align-items: start; gap: 12px; padding: 7px 0; margin: 0; }
+.form .airport input { width: 18px; height: 18px; flex-shrink: 0; }
+.airport small { display: block; margin-top: 4px; opacity: 0.75; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.form button, .refresh { cursor: pointer; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: inherit; font: inherit; }
+.form button:disabled { opacity: 0.5; cursor: default; }
+.form .primary { background: #224fc4; color: #fff; border-color: #224fc4; padding: 13px 20px; }
+.summary { background: var(--elevated); }
+.error { color: var(--price-up); }
+.details { border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin: 18px 0; }
+.dealList { display: grid; gap: 12px; padding: 0; list-style: none; }
+.dealList li { border-top: 1px solid var(--border); padding-top: 12px; }
+@media (max-width: 640px) { .columns { grid-template-columns: 1fr; } .root { padding: 20px 14px 40px; } .form fieldset { padding: 14px; } }

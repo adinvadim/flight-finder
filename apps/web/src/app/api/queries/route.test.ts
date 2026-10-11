@@ -85,6 +85,48 @@ const validBody = {
 };
 
 describe('POST /api/queries', () => {
+  const dealBody = { ...validBody, originCountry: 'ID', dealMinDiscountPct: 30, maxLayoverHours: 4,
+    dateFrom: '2027-12-01', outboundDateTo: '2027-12-03', returnDateFrom: '2027-12-05', dateTo: '2027-12-07',
+    routes: [{ origin: 'DPS', originName: 'Bali', destination: 'KUL', destinationName: 'Kuala Lumpur', selectedFlights: [] }] };
+  it('persists the explicit deal windows without converting them to pinned legacy dates', async () => {
+    const response = await POST(makeRequest(dealBody));
+    expect(response.status).toBe(201);
+    expect(mockQueryCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ originCountry: 'ID',
+      outboundDateTo: new Date('2027-12-03'), returnDateFrom: new Date('2027-12-05'), maxLayoverHours: 4,
+      strictTravelDuration: true, dealMinDiscountPct: 30 }) });
+  });
+  it.each([{ originCountry: 'TH' }, { outboundDateTo: '2027-12-31', returnDateFrom: '2028-01-01', dateTo: '2028-01-31' }])('rejects invalid country/workload before persistence: %j', async override => {
+    const response = await POST(makeRequest({ ...dealBody, ...override }));
+    expect(response.status).toBe(400);
+    expect(mockQueryCreate).not.toHaveBeenCalled();
+  });
+  it('rejects a route return pin that would expand a validated 31-pair grid to 961 pairs', async () => {
+    const response = await POST(makeRequest({ ...dealBody, outboundDateTo: '2027-12-31',
+      returnDateFrom: '2028-01-01', dateTo: '2028-01-01',
+      routes: [{ ...dealBody.routes[0], returnDate: '2028-01-31' }] }));
+    expect(response.status).toBe(400);
+    expect(mockQueryCreate).not.toHaveBeenCalled();
+  });
+  it('rejects extra VPN passes in an explicitly bounded deal search', async () => {
+    const response = await POST(makeRequest({ ...dealBody, vpnCountries: ['JP'] }));
+    expect(response.status).toBe(400);
+    expect(mockQueryCreate).not.toHaveBeenCalled();
+  });
+  it('keeps a one-way deal ending today active throughout its inclusive final UTC day', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrow = new Date(`${today}T00:00:00Z`);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    const response = await POST(makeRequest({ ...dealBody, tripType: 'one_way',
+      dateFrom: today, outboundDateTo: today, dateTo: today, returnDateFrom: null }));
+    expect(response.status).toBe(201);
+    expect(mockQueryCreate.mock.calls[0]?.[0].data.expiresAt).toEqual(tomorrow);
+  });
+  it('expires a one-way deal after the final day across a year boundary', async () => {
+    const response = await POST(makeRequest({ ...dealBody, tripType: 'one_way',
+      dateFrom: '2027-12-30', outboundDateTo: '2027-12-31', dateTo: '2027-12-31', returnDateFrom: null }));
+    expect(response.status).toBe(201);
+    expect(mockQueryCreate.mock.calls[0]?.[0].data.expiresAt).toEqual(new Date('2028-01-01T00:00:00Z'));
+  });
   it.each([
     { timePreference: 'morning', strictDepartureTime: 'false' },
     { timePreference: 'any', strictDepartureTime: true },
@@ -116,6 +158,7 @@ describe('POST /api/queries', () => {
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(201);
     expect(mockQueryCreate.mock.calls[0]?.[0].data.strictDepartureTime).toBe(false);
+    expect(mockQueryCreate.mock.calls[0]?.[0].data.expiresAt).toEqual(new Date('2026-06-22T00:00:00Z'));
   });
 
   it.each([null, 123, {}, ' '])('rejects malformed airline metadata before deriving a flight identity: %j', async (airline) => {

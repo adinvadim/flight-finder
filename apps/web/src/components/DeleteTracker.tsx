@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { getDeleteToken, removeSavedTracker } from '@/lib/tracker-storage';
+import { removeSavedTracker } from '@/lib/tracker-storage';
 import styles from './DeleteTracker.module.css';
+import { useDeleteToken } from '@/lib/tracker-storage/use-delete-token';
 
 interface Props {
   queryId: string;
@@ -17,7 +18,7 @@ export function DeleteTracker({ queryId }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const token = typeof window !== 'undefined' ? getDeleteToken(queryId) : null;
+  const token = useDeleteToken(queryId);
 
   const handleDelete = async () => {
     setDeleting(true);

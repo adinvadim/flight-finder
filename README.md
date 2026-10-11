@@ -2,6 +2,8 @@
 
 # Flight Finder
 
+This personal fork adds country-based flexible flight deal monitoring at `/deals`, initially configured for Indonesia. Read [personal setup, discount calculation and source limitations](docs/personal-deals.md). GitHub Actions is disabled on this fork; verification runs locally with `npm run ci`.
+
 **Flight, hotel, and car rental prices, tracked on your terms.**
 
 Track flights, hotels, and car rentals independently in one self-hosted app.

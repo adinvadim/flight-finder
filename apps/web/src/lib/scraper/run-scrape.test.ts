@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mockPrisma, mockNavigateGoogleFlights, mockNavigateAirlineDirect, mockExtractPrices, runScrapeForQuery, BASE_QUERY } from '../../test/scraper/run-scrape-fixture';
+import { mockPrisma, mockNavigateGoogleFlights, mockNavigateAirlineDirect, mockExtractPrices, runScrapeForQuery, runFullScrapeForQuery, BASE_QUERY } from '../../test/scraper/run-scrape-fixture';
 import { runScrapeAll } from './run-scrape';
 import { TravelCleanupError } from '../travel/execution';
 
@@ -38,6 +38,41 @@ describe('runScrapeForQuery', () => {
       resultsFound: true,
       source: 'google_flights',
     });
+  });
+
+  it('persists different returns and retains an unchecked return pair after partial failure', async () => {
+    const query = { ...BASE_QUERY, dateFrom: new Date('2026-12-01'), outboundDateTo: new Date('2026-12-01'),
+      returnDateFrom: new Date('2026-12-05'), dateTo: new Date('2026-12-06') };
+    mockPrisma.query.findUnique.mockResolvedValue(query);
+    const fare = { travelDate: '2026-12-01', price: 100, currency: 'USD', airline: 'Delta', bookingUrl: '', stops: 0,
+      duration: '5h', flightNumber: 'DL100', departureTime: '08:00' };
+    mockExtractPrices.mockResolvedValue({ prices: [fare], usage: { inputTokens: 100, outputTokens: 20 } });
+    expect(await runScrapeForQuery('q1')).toMatchObject({ status: 'success', snapshotsCount: 2 });
+    const first = mockPrisma.priceSnapshot.createMany.mock.calls.flatMap(([input]) => input.data);
+    expect(first.map(row => row.returnTravelDate.toISOString().slice(0, 10))).toEqual(['2026-12-05', '2026-12-06']);
+    expect(new Set(first.map(row => row.flightId)).size).toBe(2);
+    mockPrisma.priceSnapshot.createMany.mockClear();
+    mockPrisma.priceSnapshot.findMany.mockResolvedValue(first.map(row => ({ ...row, status: 'available' })));
+    mockNavigateGoogleFlights.mockImplementation(async params => ({
+      html: params.dateTo.toISOString().slice(0, 10) === '2026-12-06' ? '<html>unavailable</html>' : '<html>flights</html>',
+      url: 'https://flights.google.com', resultsFound: true, source: 'google_flights' }));
+    mockExtractPrices.mockImplementation(async html => html.includes('unavailable')
+      ? { prices: [], usage: { inputTokens: 100, outputTokens: 20 }, failureReason: 'all_filtered_out' }
+      : { prices: [fare], usage: { inputTokens: 100, outputTokens: 20 } });
+    expect(await runScrapeForQuery('q1')).toMatchObject({ status: 'partial', snapshotsCount: 1 });
+    const second = mockPrisma.priceSnapshot.createMany.mock.calls.flatMap(([input]) => input.data);
+    expect(second.some(row => row.status === 'sold_out')).toBe(false);
+  });
+  it('executes a bounded deal grid once despite inherited VPN-country settings', async () => {
+    mockPrisma.query.findUnique.mockResolvedValue({ ...BASE_QUERY, dealMinDiscountPct: 30, tripType: 'one_way',
+      dateFrom: new Date('2026-12-15'), dateTo: new Date('2026-12-15'), outboundDateTo: new Date('2026-12-15') });
+    mockPrisma.extractionConfig.findFirst.mockResolvedValue({ provider: 'anthropic', vpnProvider: null, vpnCountries: ['JP', 'DE'] });
+    mockExtractPrices.mockResolvedValue({ prices: [{ travelDate: '2026-12-15', price: 100, currency: 'USD',
+      airline: 'Delta', bookingUrl: '', stops: 0, duration: '5h' }], usage: { inputTokens: 100, outputTokens: 20 } });
+    const result = await runFullScrapeForQuery('q1');
+    expect(result).toHaveLength(1);
+    expect(result[0]?.status).toBe('success');
+    expect(mockNavigateGoogleFlights).toHaveBeenCalledTimes(1);
   });
 
   it('keeps distinct flights available when their previously different fares become equal', async () => {
